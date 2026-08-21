@@ -31,7 +31,7 @@ def get_status() -> dict:
 
 
 def get_strategie() -> dict:
-    """Roher Inhalt von STRATEGIE.md (Timos Dokument, read-only)."""
+    """Roher Inhalt von STRATEGIE.md (Dokument des Betreibers, read-only)."""
     text, updated = _read_file(STRATEGIE_FILE)
     return {"raw": text, "updated": updated}
 

@@ -256,10 +256,10 @@ def _mark_answered(card: dict, choice: str, is_delete: bool) -> None:
                   card.get("id"), is_delete)
         return
     if is_delete:
-        _append_body(card, f"\n\n— 🗑️ Timos Antwort: {choice} · als Rauschen gelöscht (wird später endgültig entfernt)")
+        _append_body(card, f"\n\n— 🗑️ Antwort: {choice} · als Rauschen gelöscht (wird später endgültig entfernt)")
         card["title"] = f"🗑️ {choice[:60]} — {card.get('title', '')}"[:160]
     else:
-        _append_body(card, f"\n\n— ✅ Timos Antwort: {choice}")
+        _append_body(card, f"\n\n— ✅ Antwort: {choice}")
         card["title"] = f"✅ {choice[:70]} — {card.get('title', '')}"[:160]
 
 

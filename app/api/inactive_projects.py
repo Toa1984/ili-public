@@ -21,7 +21,7 @@ def get_inactive_projects(
     """Liste der inaktiven Projekte.
 
     Args:
-        threshold_days: Schwellwert (default 30 Tage, Timos Entscheidung: Hybrid Git+Board)
+        threshold_days: Schwellwert (default 30 Tage, Entscheidung: Hybrid Git+Board)
         limit: Max. Anzahl Ergebnisse (zur Sicherheit limitiert)
 
     Returns:

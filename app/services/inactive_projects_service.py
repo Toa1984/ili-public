@@ -20,7 +20,7 @@ log = logging.getLogger("dashboard.services.inactive_projects")
 _manifest = ManifestRepository()
 _board_repo = BoardRepository()
 
-# Config: Schwellwert (Tage ohne Aktivität = inaktiv). Timos Entscheidung (Kanban-Karte
+# Config: Schwellwert (Tage ohne Aktivität = inaktiv). Entscheidung (Kanban-Karte
 # decision-1786344589, Board projekt-leichen-9k0ini): Hybrid aus Git-Commit UND Board-mtime, 30 Tage.
 INACTIVITY_THRESHOLD_DAYS = int(os.environ.get("INACTIVITY_THRESHOLD_DAYS", "30"))
 
