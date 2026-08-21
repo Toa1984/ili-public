@@ -40,7 +40,7 @@
         { id: 'nav-link-autodev',  href: '/autodev.html',      icon: '🤖', key: 'nav.autodev',  label: 'Auto-Entwicklung' },
         { id: 'nav-link-quick',    href: '/quick.html',        icon: '⚡', key: 'nav.quick',    label: 'Schnellstart' },
         { id: 'nav-link-bugs',     href: '/bugs.html',         icon: '🐞', key: 'nav.bugs',     label: 'Bugs' },
-        { id: 'nav-link-terminal', href: 'https://terminal.' + BASE + '/', icon: '💻', key: 'nav.terminal', label: 'Terminal', external: true },
+        { id: 'nav-link-terminal', href: '/projterm/',         icon: '💻', key: 'nav.terminal', label: 'Terminal', external: true },
         { id: 'nav-link-cost',     href: '/cost.html',         icon: '💰', key: 'nav.cost',     label: 'Kosten' },
         { id: 'nav-link-tokenguard', href: '/token-spikes.html', icon: '📈', key: 'nav.tokenguard', label: 'Token-Wächter' },
         { id: 'nav-link-datenbanken', href: '/datenbanken.html', icon: '🗄️', key: 'nav.datenbanken', label: 'Datenbanken' },

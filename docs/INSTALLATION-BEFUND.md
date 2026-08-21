@@ -195,6 +195,56 @@ in einem Ollama-Modellnamen in `html/ai-settings.html:254`. Kein
 Sicherheitsproblem — nur ein Hinweis auf die Herkunft, falls das Repo
 veröffentlicht wird.
 
+### P8 — Nav-Links auf Sub-Domains, die es bei einer Neuinstallation nicht gibt
+
+`html/nav.js` leitet die Basis-Domain aus dem eigenen Hostnamen ab:
+
+```js
+const _h = location.hostname;
+const BASE = _h.includes('.') ? _h.slice(_h.indexOf('.') + 1) : _h;
+```
+
+Auf der Caddy-Installation des Autors (`dashboard.intranet.<domain>`) ergibt das
+die richtige Basis. Bei einer Container-Installation auf `http://localhost:8080`
+enthält der Hostname keinen Punkt, `BASE` wird zu `localhost`, und drei
+Nav-Einträge zeigen ins Leere:
+
+| Eintrag | erzeugte URL | Problem |
+|---|---|---|
+| `nav-link-terminal` | `https://terminal.localhost/` | Sub-Domain existiert nicht; zusätzlich hartes `https://` und der Port `:8080` fällt weg |
+| `nav-link-scan` | `https://shelly-scanner.localhost/lan` | Dienst ist in ili gar nicht enthalten |
+| `nav-link-shelly` | `https://shelly-scanner.localhost/` | dito |
+
+**Terminal — behoben.** Der Container-Stack bedient das Terminal same-origin
+unter `/projterm/`: `deploy/nginx-setup.sh` schreibt dafür einen
+`location ^~ /projterm/`-Block, den `deploy/nginx-portable.conf` per
+`include /etc/nginx/ili-projterm*.conf` einbindet. Der Rest des Frontends nutzt
+längst genau diesen Pfad — `leichen.html`, `fragen.html`, `m/m.js`,
+`js/project-chat-terminal.js` und `ili-terminal-login.html` verlinken alle
+`/projterm/`. `nav.js` war die einzige Stelle mit der Sub-Domain-Form. Der Link
+zeigt jetzt ebenfalls auf `/projterm/`.
+
+Das ist kein Container-Sonderweg: `/projterm/` existiert auf der Installation des
+Autors genauso, sonst wären die fünf genannten Dateien dort schon kaputt. Ohne
+`?arg=<board>` landet man laut `deploy/terminal/ili-term.sh` in der generischen
+Session `proj-home` unter `$PROJECTS_DIR` — passend für einen allgemeinen
+Nav-Eintrag.
+
+**Shelly-Links — offen.** Beide Einträge zeigen auf einen Dienst, den ili nicht
+mitbringt. Sie hier zu entfernen würde sie auf der Installation des Autors
+abschalten, wo sie funktionieren; das ist eine Produktentscheidung und wurde
+deshalb nicht angefasst.
+
+**Wichtig, unabhängig vom Link:** Das Projekt-Terminal startet **nicht**
+automatisch mit. `docker compose up -d --build` allein lässt `/projterm/` mit
+einem 503 antworten, das genau darauf hinweist. Es braucht die zweite
+Compose-Datei:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.terminal.yml up -d --build
+docker compose logs web | grep ili-setup      # zeigt das generierte Passwort
+```
+
 ---
 
 ## Empfehlung
