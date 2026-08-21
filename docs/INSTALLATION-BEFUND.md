@@ -519,6 +519,151 @@ docker compose logs web | grep ili-setup      # zeigt das generierte Passwort
 
 ---
 
+## Konzept: Terminal-Passwort personalisieren
+
+Entwurf, **nicht umgesetzt**. Frage war: kann ili Benutzer und Passwort erzeugen
+und verlangen, dass beides nach der ersten Nutzung durch eigene Werte ersetzt
+wird?
+
+Kurz: ja, aber nicht als Einstellung. Basic Auth kennt kein „muss geändert
+werden" — das braucht Zustand und eine Stelle, die ein Formular entgegennimmt.
+Wie weit man geht, ist eine Abwägung, keine technische Zwangslage.
+
+### Ausgangslage (verifiziert)
+
+`deploy/nginx-setup.sh` erzeugt beim Start des `web`-Containers ein Passwort,
+falls `TERMINAL_PASSWORD` leer ist, schreibt es als `{SHA}`-Hash nach
+`/etc/nginx/ili-terminal.htpasswd` und druckt es ins Log. Die Variable
+`GENERATED` im Skript hält fest, ob generiert oder aus der Umgebung übernommen
+wurde.
+
+Drei Eigenschaften dieser Konstruktion bestimmen alles Weitere:
+
+1. **Die htpasswd liegt im Container-Dateisystem**, nicht in einem Volume. Sie
+   ist nach jedem Neustart weg und wird neu geschrieben — ein generiertes
+   Passwort wechselt also bei jedem Start.
+2. **Es gibt keinen Prozess, der ein Formular annehmen könnte.** nginx liefert
+   statische Dateien und proxyt; ein Passwortwechsel braucht jemanden, der
+   POST-Daten verarbeitet und die htpasswd neu schreibt.
+3. **`web` und `api` teilen kein Volume.** Der API-Container hat `/app/data`,
+   der Web-Container nichts Schreibbares. Jede Lösung mit Zustand muss das
+   zuerst ändern.
+
+### Variante A — nur dokumentieren
+
+README und `docs/PROJECT-TERMINAL.md` sagen deutlich: es wird eines generiert, es
+steht im Log, es wechselt bei jedem Neustart, setz dir ein eigenes in `.env`.
+Dazu der fehlende `restart web`-Hinweis aus P10.
+
+Kein Code, kein Risiko. Erzwingt nichts — aber es behebt den heutigen Zustand,
+dass die Anleitung den Neustart-Wechsel gar nicht erwähnt.
+
+### Variante B — Hinweis im Dashboard, solange das generierte Passwort gilt
+
+Der interessante Punkt: **das Setup-Skript weiss die Antwort bereits.** Es kann
+seinen `GENERATED`-Zustand als winzigen statischen Endpunkt mit ausgeben, in
+derselben Datei, die es ohnehin schreibt:
+
+```nginx
+location = /projterm/state {
+    default_type application/json;
+    return 200 '{"generated":true}';
+}
+```
+
+Das Frontend fragt den Endpunkt ab und blendet einen Hinweis ein: „Das
+Terminal-Passwort wurde automatisch erzeugt und wechselt bei jedem Neustart —
+setz `TERMINAL_PASSWORD` in deiner `.env`."
+
+Reizvoll, weil es **ohne** Zustandsspeicher, ohne API-Beteiligung und ohne
+Änderung am Auth-Mechanismus auskommt. Ein Hinweis, kein Zwang — aber er
+erscheint genau dann, wenn er zutrifft, statt in einer Doku, die niemand liest.
+
+Aufwand: ein `location`-Block in `nginx-setup.sh`, ein `fetch` im Frontend, ein
+Banner.
+
+### Variante C — erzwungene Personalisierung
+
+Die einzige Variante, die den Namen verdient. Sie ersetzt Basic Auth:
+
+```
+Browser ──► web (nginx)
+              │  auth_request ──► api  (prüft Cookie/Session)
+              │                    └─ Zustand in /app/data
+              │  solange nicht personalisiert: 302 auf /terminal-setup.html
+              ▼
+           terminal (ttyd)
+```
+
+Was dazugehört:
+
+| Baustein | Wo |
+|---|---|
+| Zugangsdaten + Flag `personalized` | `/app/data` im API-Container (Volume existiert) |
+| Login-Seite und Setup-Seite | neu in `html/` |
+| `POST /api/terminal-auth` (Login) und `POST /api/terminal-password` (Wechsel) | neuer Router in `app/api/` |
+| `auth_request`-Block statt `auth_basic` | `deploy/nginx-setup.sh` |
+| Einmal-Token für den allerersten Aufruf | beim ersten Start erzeugt, ins Log |
+
+Nebeneffekt, der für die Variante spricht: das heutige Cookie-Konstrukt existiert
+nur, weil Safari bei einem WebSocket-Handshake keine Basic-Credentials sendet
+(steht so im Kopf von `nginx-setup.sh`). Eine formularbasierte Anmeldung mit
+Session-Cookie hat dieses Problem gar nicht erst — der WS-Pfad und der HTML-Pfad
+prüfen dann dasselbe Cookie.
+
+Der Einwand: **das ist die einzige Schranke vor einer Root-Shell.** Der heutige
+Aufbau ist klein, gut kommentiert und schwer falsch zu machen. Eine selbstgebaute
+Session-Verwaltung ist es nicht. Wer diesen Weg geht, sollte Session-Ablauf,
+Brute-Force-Bremse und die Cookie-Attribute bewusst festlegen — und `deploy/`
+danach mit `/security-review` gegenlesen.
+
+### Variante D — erster Login ohne Passwort
+
+Der Vorschlag „beim ersten Mal ohne Passwort rein, dann muss man eines setzen"
+hat ein Loch, das gegen ihn spricht: `docker-compose.yml` veröffentlicht den Port
+als `${ILI_PORT:-8080}:80` — auf **allen** Interfaces, nicht nur auf
+`127.0.0.1`. Zwischen `up -d` und dem Setzen des Passworts steht damit ein offener
+Root-Shell-Zugang im ganzen LAN. Das Zeitfenster ist kurz, aber es ist real, und
+wer den Stack startet und dann Kaffee holt, lässt es offen stehen.
+
+Zwei Wege, dieselbe Bequemlichkeit ohne das Loch zu bekommen:
+
+- **Einmal-Token statt gar keiner Schranke.** Beim ersten Start wird ein Token
+  erzeugt und ins Log geschrieben; nur `/projterm/setup?token=…` ist ohne
+  Anmeldung erreichbar, und der Token stirbt beim ersten erfolgreichen Setzen.
+  Wer ins Log schauen kann, kommt ohnehin an alles — der Token verrät also
+  nichts, was nicht schon offen läge. Das ist Variante C mit einem freundlichen
+  Einstieg.
+- **Während des Setups nur lokal binden.** `ILI_PORT` vorübergehend als
+  `127.0.0.1:8080:80` — dann ist das Fenster auf den Rechner selbst begrenzt.
+  Umständlich, aber ohne jeden Code machbar.
+
+### Empfehlung
+
+**B jetzt, C wenn ili an Fremde geht.** Variante B kostet wenig, erscheint genau
+im richtigen Moment und ändert nichts an der Schranke. Solange ili im eigenen
+Netz läuft, trägt das. Sobald andere Leute es installieren — und das ist der
+erklärte Zweck des Repos — wird C zur richtigen Antwort, dann aber mit
+Sicherheits-Review statt nebenbei.
+
+D würde ich nicht in der wörtlichen Form bauen; der Einmal-Token liefert dieselbe
+Bequemlichkeit ohne das offene Fenster.
+
+### Vor dem Bauen zu verifizieren
+
+Das liess sich hier nicht prüfen, weil das Basis-Image nicht ladbar war (P1):
+
+- **Ist `ngx_http_auth_request_module` im offiziellen `nginx:alpine` enthalten?**
+  Variante C steht und fällt damit. Prüfen mit:
+  ```bash
+  docker exec dashboard-web nginx -V 2>&1 | tr ' ' '\n' | grep auth_request
+  ```
+  Fehlt es, braucht C ein anderes nginx-Image oder einen anderen Ansatz.
+- Verhalten von `auth_request` auf dem WebSocket-Upgrade-Pfad — der ist der
+  empfindliche Teil, siehe die Safari-Notiz im Skriptkopf.
+
+---
+
 ## Empfehlung
 
 1. **ili installieren, nicht den Upstream.** ili ist die für Fremdinstallation
