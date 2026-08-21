@@ -519,7 +519,7 @@ docker compose logs web | grep ili-setup      # zeigt das generierte Passwort
 
 ---
 
-## Konzept: Terminal-Passwort personalisieren
+## Konzept: Erstlauf — Passwort personalisieren, Grunddaten erfassen
 
 Entwurf, **nicht umgesetzt**. Frage war: kann ili Benutzer und Passwort erzeugen
 und verlangen, dass beides nach der ersten Nutzung durch eigene Werte ersetzt
@@ -661,6 +661,88 @@ Das liess sich hier nicht prüfen, weil das Basis-Image nicht ladbar war (P1):
   Fehlt es, braucht C ein anderes nginx-Image oder einen anderen Ansatz.
 - Verhalten von `auth_request` auf dem WebSocket-Upgrade-Pfad — der ist der
   empfindliche Teil, siehe die Safari-Notiz im Skriptkopf.
+
+
+### Erweiterung: Konfigseite beim ersten Login
+
+Vorschlag war, beim ersten Login eine Konfigseite zu öffnen und dort die
+Grunddaten einzutragen. Zwei Dinge sprechen in den Entwurf hinein.
+
+#### Es gibt bereits einen geführten Erstlauf
+
+Eine frische Installation bringt das Projekt **Einrichtung** mit fünf
+Unterprojekten mit — genau die Grunddaten, um die es geht:
+
+| Unterprojekt | Karten (Auszug) |
+|---|---|
+| Daten & Datenbank | Wo deine Daten liegen · 🟡 JSON-Dateien oder Datenbank? · Projektcode ausserhalb des Klons · Sicherung ziehen |
+| Domain & Aussenzugang | 🟡 Wie soll ili erreichbar sein? · `DASHBOARD_DOMAIN` setzen · Tunnel: Zugangsschutz ZUERST · Reverse Proxy: TLS im eigenen Netz · Terminal nur bewusst nach aussen geben |
+| KI-Anbindung | 🟡 Welche KI soll ili nutzen? · Schlüssel eintragen · Modell zur Aufgabe wählen · 🟡 Kostenbremse? |
+| Code & Beiträge | Deine Instanz ist ein git-Arbeitsbaum · 🟡 Wie hältst du eigene Änderungen? · Zugangstoken sicher ablegen |
+| Betrieb | Was gesichert werden muss · 🟡 Wie sicherst du? · Updates einspielen · Logs im Blick |
+
+Das ist eine bewusste Konstruktion: die 🟡-Karten sind Entscheidungskarten mit
+Antwortknöpfen, und die Umsetzung macht die KI im Projekt-Terminal. Der Erstlauf
+ist damit zugleich die Einführung in die Methode — das Board ist das Gedächtnis,
+das Terminal die Werkbank.
+
+Eine Konfigseite sollte das **nicht ersetzen.** Vieles davon lässt sich gar nicht
+als Formular abbilden: „Wie sicherst du?", die Wahl zwischen Tunnel und Reverse
+Proxy, die git-Strategie. Das sind Entscheidungen mit Folgearbeit, keine
+Feldwerte.
+
+#### Die harte Grenze: `.env` ist für die Container unerreichbar
+
+Verifiziert:
+
+- **Keine der Compose-Dateien mountet `.env`, und es gibt kein `env_file:`.**
+  Compose liest die Datei auf dem *Host* und reicht einzelne Werte als
+  Umgebungsvariablen weiter. Kein Container kann sie schreiben.
+- **`constants.py:77` liest `ANTHROPIC_API_KEY` beim Modul-Import**, ebenso
+  `project_links.py:30` das `DASHBOARD_DOMAIN`. Selbst wenn man die Variable
+  im laufenden Prozess änderte, wirkte es nicht.
+- `ILI_PORT`, `ILI_PROJECTS_DIR` und `COMPOSE_FILE` wirken ausschliesslich beim
+  `up` — sie steuern Portbindung und Mounts, also etwas, das vor dem Start des
+  Containers feststehen muss.
+
+Damit zerfallen die Grunddaten in zwei Klassen:
+
+| Klasse | Beispiele | Was eine Seite tun kann |
+|---|---|---|
+| **Laufzeit-Einstellungen** | Modellwahl, Effort/Temperatur, Kostenbremse, Theme, Widgets | Direkt speichern — `config_handler` (`ai_config.json`) und `user_settings_service` machen das heute schon |
+| **Start-Einstellungen** | `ANTHROPIC_API_KEY`, `OLLAMA_URL`, `DASHBOARD_DOMAIN`, `ILI_PORT`, `ILI_PROJECTS_DIR`, `TERMINAL_PASSWORD` | **Nicht** schreiben — nur den fertigen `.env`-Block erzeugen und den Neustart-Befehl dazu anzeigen |
+
+#### Entwurf, der damit funktioniert
+
+Eine Erstlauf-Seite als **Generator mit Direktspeicherung für den Teil, der
+geht**:
+
+1. **Terminal-Zugang** — Benutzer und Passwort setzen. Das ist der einzige
+   Grundwert, der sich sinnvoll erzwingen lässt (Variante C oben liefert die
+   Mechanik).
+2. **KI-Anbindung** — Schlüssel oder Ollama-URL abfragen; Modellwahl und
+   Kostenbremse landen direkt in `ai_config.json`, der Schlüssel im
+   `.env`-Block.
+3. **Erreichbarkeit** — Domain und Port abfragen, aber nur als Vorbereitung:
+   die Seite zeigt, was in die `.env` gehört.
+4. **Ausgabe:** ein kopierfertiger `.env`-Block plus
+   `docker compose up -d` — und der ehrliche Hinweis, dass die Start-Werte erst
+   danach greifen.
+5. **Weiterleitung** auf das Projekt *Einrichtung* für alles, was Entscheidung
+   statt Feldwert ist.
+
+Der Reiz: die Seite nimmt dem Erstlauf das Fummelige (Passwort, Schlüssel,
+Domain-Schreibweise) ab, ohne zu behaupten, sie könne Dinge anwenden, die einen
+Neustart brauchen. Der Ehrlichkeitsteil — „das hier musst du selbst in die `.env`
+schreiben" — ist kein Makel, sondern die einzige korrekte Aussage.
+
+#### Was es nicht werden sollte
+
+Eine Seite, die so *aussieht*, als übernähme sie die Werte, es aber nicht tut.
+Das ist die schlechteste Variante: der Nutzer trägt den Schlüssel ein, klickt
+Speichern, und die KI-Funktionen bleiben trotzdem aus, weil `constants.py` den
+Wert längst beim Start gelesen hat. Lieber gar kein Feld als ein Feld, dessen
+Wirkung erst nach einem Neustart eintritt, den niemand angesagt hat.
 
 ---
 
