@@ -17,7 +17,6 @@ Ein persönliches Homelab-Dashboard mit Multi-Board Kanban, KI-Chat, Projekt-Man
 | **Log-Scanner** | Fehler aus systemd journal + Datei-Logs → Kanban-Karten |
 | **Service-Übersicht** | Alle Dienste mit URLs, Status und Projekt-Links |
 | **Web-Adressen** | Automatisch aus Caddy-Config generierte interne/externe URL-Liste |
-| **Shelly-Scanner** | Shelly-Geräte im LAN erkennen + MQTT-Config auslesen |
 | **Kosten-Monitor** | Claude-API-Kosten und Ollama-Nutzung verfolgen |
 | **Anhänge** | Board-Karten-Anhänge lokal + OneDrive via rclone |
 | **Mobile-UI** | Kompaktes `/m/`-Interface für Smartphones |
@@ -151,9 +150,6 @@ GH_ADMIN_TOKEN=ghp_...
 # Gesprächsbegleiter externer Hostname (optional)
 GB_EXTERNAL_HOST=                  # z.B. "yourapp.yourdomain.example"
 
-# Shelly-Scanner Subnetz(e) (kommagetrennt)
-SHELLY_SUBNETS=192.168.1.0/24
-
 # Anhänge (optional — für Board-Karten-Dateien)
 ATTACH_LOCAL_BASE=/mnt/data/Dashboard-Anhaenge
 ATTACH_RCLONE_REMOTE=onedrive:Dashboard-Anhaenge
@@ -229,8 +225,6 @@ Die REST-API läuft auf Port 8798. Wichtige Endpunkte:
 | `/boards/{id}` | GET/PUT | Board lesen/schreiben |
 | `/api/chat` | POST | KI-Chat (Ollama/Claude) |
 | `/api/client-config` | GET | Frontend-Konfiguration (DASHBOARD_DOMAIN etc.) |
-| `/config` | GET/POST | Scan-Konfiguration |
-| `/shelly` | GET | Shelly-Geräte scannen |
 | `/scan-logs` | GET | Log-Scanner starten |
 | `/health` | GET | Health-Check |
 

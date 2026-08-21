@@ -230,10 +230,19 @@ Autors genauso, sonst wären die fünf genannten Dateien dort schon kaputt. Ohne
 Session `proj-home` unter `$PROJECTS_DIR` — passend für einen allgemeinen
 Nav-Eintrag.
 
-**Shelly-Links — offen.** Beide Einträge zeigen auf einen Dienst, den ili nicht
-mitbringt. Sie hier zu entfernen würde sie auf der Installation des Autors
-abschalten, wo sie funktionieren; das ist eine Produktentscheidung und wurde
-deshalb nicht angefasst.
+**Shelly-Links — entfernt.** Entscheidung des Betreibers: der Shelly-Scanner
+gehört in ein eigenes Projekt. Das deckt sich mit dem Code, der schon dort ist —
+`app/api/misc.py`, `app/services/misc_service.py` und `app/api/config.py`
+vermerken, dass `GET /shelly` am 2026-08-01 und `POST /trigger-scan` samt
+`/config` am 2026-08-07 in den Container `shelly-scanner` gewandert sind. Es gibt
+in ili **keine** dieser Routen mehr; Nav-Einträge, Sprachschlüssel und
+README-Zeilen waren reine Karteileichen. Alle entfernt, siehe
+[AENDERUNGEN.md](AENDERUNGEN.md).
+
+Damit ist die Hostnamen-Ableitung (`BASE`) in `nav.js` ohne Verwendung und
+ebenfalls entfallen — die Ursache aus diesem Abschnitt existiert nicht mehr,
+statt nur an einer Stelle umgangen zu sein. Sämtliche Nav-Ziele sind jetzt
+same-origin.
 
 **Wichtig, unabhängig vom Link:** Das Projekt-Terminal startet **nicht**
 automatisch mit. `docker compose up -d --build` allein lässt `/projterm/` mit

@@ -4,10 +4,9 @@
 (function () {
     'use strict';
 
-    // Basis-Domain aus eigenem Hostnamen ableiten (dashboard.<base> → <base>),
-    // damit keine echte Domain im Repo steht.
-    const _h = location.hostname;
-    const BASE = _h.includes('.') ? _h.slice(_h.indexOf('.') + 1) : _h;
+    // Alle Nav-Ziele sind same-origin. Frueher wurde hier eine Basis-Domain aus
+    // location.hostname abgeleitet, um auf Nachbar-Sub-Domains zu verlinken; auf
+    // einer Installation ohne Punkt im Hostnamen (localhost) ergab das tote Links.
 
     // Texte kommen aus der Sprachdatei (/i18n/de.js) ueber den UI-Kit-Helfer.
     // Beides ist optional: fehlt es, greift der hier stehende Fallback-Text —
@@ -45,7 +44,6 @@
         { id: 'nav-link-tokenguard', href: '/token-spikes.html', icon: '📈', key: 'nav.tokenguard', label: 'Token-Wächter' },
         { id: 'nav-link-datenbanken', href: '/datenbanken.html', icon: '🗄️', key: 'nav.datenbanken', label: 'Datenbanken' },
         { id: 'nav-link-neuesprojekt', href: '/projekt.html',  icon: '➕', key: 'nav.neuesprojekt', label: 'Neues Projekt' },
-        { id: 'nav-link-scan',     href: 'https://shelly-scanner.' + BASE + '/lan', icon: '🔍', key: 'nav.scan',     label: 'LAN-Scan' },
         { id: 'nav-link-kiadvisor', href: '/ki-advisor.html',  icon: '🤖', key: 'nav.kiadvisor', label: 'KI-Advisor' },
         { id: 'nav-link-kisettings', href: '/ai-settings.html', icon: '⚙️', key: 'nav.kisettings', label: 'KI-Settings' },
         { id: 'nav-link-whitelist', href: '/whitelist.html',   icon: '🔐', key: 'nav.whitelist', label: 'Whitelist' },
@@ -53,7 +51,6 @@
         { id: 'nav-link-flow',     href: '/masterchat-flow.html',   icon: '🔀', key: 'nav.flow',      label: 'Flow' },
         { id: 'nav-link-container', href: '/container-manager.html', icon: '📦', key: 'nav.container', label: 'Container' },
         { id: 'nav-link-wiki',      href: '/wiki.html',        icon: '📚', key: 'nav.wiki',      label: 'Code-Wiki' },
-        { id: 'nav-link-shelly',   href: 'https://shelly-scanner.' + BASE + '/', icon: '📡', key: 'nav.shelly', label: 'Shelly' },
         { id: 'nav-link-ollamaqueue', href: '/ollama-queue.html', icon: '🦙', key: 'nav.ollamaqueue', label: 'Ollama-Queue' },
     ];
 
