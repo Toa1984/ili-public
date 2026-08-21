@@ -254,6 +254,72 @@ docker compose -f docker-compose.yml -f docker-compose.terminal.yml up -d --buil
 docker compose logs web | grep ili-setup      # zeigt das generierte Passwort
 ```
 
+
+### P9 — Feste `container_name` unterlaufen den festen Projektnamen
+
+`docker-compose.yml` setzt in Zeile 15 bewusst `name: ili`, damit die Volumes nach
+einem Umbenennen des Ordners nicht verwaisen. Zwei Zeilen weiter wird dieser
+Nutzen für die Container wieder aufgehoben:
+
+| Datei | Zeile | Wert |
+|---|---|---|
+| `docker-compose.yml` | 23 | `container_name: dashboard-api` |
+| `docker-compose.yml` | 51 | `container_name: dashboard-web` |
+| `docker-compose.terminal.yml` | 26 | `container_name: ili-terminal` |
+
+Container-Namen sind in Docker **global**, nicht pro Projekt. Das Werkstatt-Repo
+vergibt in seiner `docker-compose.yml` (Zeilen 17 und 42) exakt dieselben Namen
+`dashboard-api` und `dashboard-web` und hat gar kein `name:`. Beide Stacks können
+deshalb nie nebeneinander laufen — der zweite `up` scheitert am belegten Namen
+oder hinterlässt eine gestoppte Leiche.
+
+Auffällig ist die Inkonsistenz innerhalb von ili selbst: der Terminal-Service
+heißt korrekt `ili-terminal`, `api` und `web` tragen noch die Namen aus der
+Herkunft. Naheliegend wäre `ili-api` / `ili-web` — oder `container_name` ganz
+weglassen, dann bildet Compose aus dem Projektnamen ohnehin `ili-api-1` und
+`ili-web-1`.
+
+Nicht geändert: das benennt laufende Container um, was bestehende Installationen
+und jedes Skript trifft, das die Namen verwendet. Eine Entscheidung des
+Betreibers, kein Bugfix.
+
+### P10 — Der 503-Stub bleibt liegen, wenn das Terminal nachträglich startet
+
+`deploy/nginx-setup.sh` läuft als `/docker-entrypoint.d/20-ili-setup.sh` und
+entscheidet **einmal beim Start des `web`-Containers** in drei Stufen:
+
+```sh
+if probe;                                    then  # Terminal antwortet -> Route verdrahten
+elif nslookup "$TERMINAL_HOST" >/dev/null;   then  # Name loest auf -> trotzdem verdrahten
+else write_stub                                    # 503 mit Anleitung
+```
+
+Die mittlere Stufe fängt den Fall ab, dass der Terminal-Container noch bootet.
+Der Stub entsteht also nur, wenn der Service zum Startzeitpunkt von `web`
+überhaupt nicht im Compose-Netz war — der Normalfall bei einem laufenden Stack,
+den man nachträglich um `-f docker-compose.terminal.yml` erweitert.
+
+Der Skript-Kopf kennt das Verhalten („Writing the stub instead would leave a 503
+behind that only a restart of this container could clear"), aber weder
+`QUICKSTART.md` noch `docs/PROJECT-TERMINAL.md` sagen es dem Nutzer. Beide zeigen
+nur:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.terminal.yml up -d
+```
+
+Wer den Stack vorher schon laufen hatte, bekommt danach weiter den 503 und hat
+keinen Hinweis, woran es liegt — der Stub-Text nennt genau den Befehl, den man
+gerade ausgeführt hat. Nötig ist zusätzlich:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.terminal.yml restart web
+```
+
+Zwei mögliche Behebungen: den Satz in beide Anleitungen aufnehmen, oder den
+Stub-Text um den `restart web`-Hinweis ergänzen. Nicht umgesetzt — beides ändert
+Text, der ins Werkstatt-Repo zurückfließen sollte.
+
 ---
 
 ## Änderungen auf diesem Branch
@@ -420,6 +486,8 @@ Entscheidung. Details jeweils in den Abschnitt „Probleme" oben.
 
 | Was | Wo | Warum offen |
 |---|---|---|
+| Feste `container_name: dashboard-api` / `dashboard-web` kollidieren mit dem Werkstatt-Repo (P9) | beide | Umbenennen trifft laufende Installationen und Skripte, die die Namen nutzen |
+| `restart web` fehlt in den Terminal-Anleitungen (P10) | beide | Textänderung, die ins Werkstatt-Repo zurückfliessen sollte |
 | `html/services.html` enthält E-Mail, Login-Namen, interne IPs und Zugangsdaten-Paare | nur `dashboard` | Datei ist generierter, personalisierter Inhalt; gehört in `.gitignore` + `.containerignore` statt ins Repo. Landet aktuell über `COPY html/ html/` im Image **und** wird per Bind-Mount ausgeliefert |
 | Echte Domain in sechs `<a href>`-Links | nur `dashboard` | `tests/test_frontend_asset_urls.py` bewacht nur `<script src>` und `<link href>` und erlaubt `<a href>` ausdrücklich — die Guard-Regel greift für genau diesen Fall nicht |
 | `Containerfile` kopiert die gitignoreten `board_templates.json` / `automat_limits.json` | nur `dashboard` | Build ist nach frischem Clone kaputt. Naheliegend: die `.example`-Varianten kopieren, analog zu `services_config.example.json` |
